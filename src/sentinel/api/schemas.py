@@ -21,3 +21,24 @@ class RootResponse(BaseModel):
     service: str
     description: str
     version: str
+
+class AnalysisResponse(BaseModel):
+    """SentinelAI security analysis response."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    event_id: str
+    entity_id: str
+
+    risk_score: float
+    severity: str
+    is_suspicious: bool
+
+    summary: str
+    reasons: list[str]
+
+    ml_anomaly_score: float
+    ml_flagged: bool
+
+    ml_contribution: float
+    behavioral_contribution: float
