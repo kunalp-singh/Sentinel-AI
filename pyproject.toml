@@ -19,6 +19,8 @@ dependencies = [
     "pandas>=2.2,<4.0",
     "faker>=37.0,<40.0",
     "scikit-learn>=1.5,<2.0",
+    "fastapi>=0.115,<1.0",
+    "uvicorn[standard]>=0.34,<1.0",
 ]
 
 
@@ -29,6 +31,7 @@ dev = [
     "ruff>=0.9",
     "mypy>=1.14",
     "pandas-stubs>=2.2",
+    "httpx2",
 ]
 
 
