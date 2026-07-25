@@ -5,8 +5,13 @@ import pytest
 from sentinel.domain import EventOutcome, ThreatLabel
 from sentinel.synthetic import (
     BruteForceInjector,
+    ImpossibleTravelInjector,
     NormalEventGenerator,
     PersonaFactory,
+)
+from sentinel.synthetic.geo import (
+    haversine_distance_km,
+    implied_speed_kmh,
 )
 
 
@@ -136,3 +141,133 @@ def test_brute_force_rejects_empty_events() -> None:
 
     with pytest.raises(ValueError):
         injector.inject([], persona)
+
+def test_impossible_travel_adds_one_event() -> None:
+    persona, events = build_baseline()
+
+    result = ImpossibleTravelInjector(
+        seed=42,
+        travel_minutes=30,
+    ).inject(events, persona)
+
+    assert len(result) == len(events) + 1
+
+
+def test_impossible_travel_is_labeled() -> None:
+    persona, events = build_baseline()
+
+    result = ImpossibleTravelInjector(
+        seed=42,
+        travel_minutes=30,
+    ).inject(events, persona)
+
+    attack_events = [
+        event
+        for event in result
+        if event.label
+        == ThreatLabel.IMPOSSIBLE_TRAVEL
+    ]
+
+    assert len(attack_events) == 1
+
+
+def test_impossible_travel_changes_country() -> None:
+    persona, events = build_baseline()
+
+    result = ImpossibleTravelInjector(
+        seed=42,
+        travel_minutes=30,
+    ).inject(events, persona)
+
+    attack_event = next(
+        event
+        for event in result
+        if event.label
+        == ThreatLabel.IMPOSSIBLE_TRAVEL
+    )
+
+    assert (
+        attack_event.geo_location.country_code
+        != persona.home_location.country_code
+    )
+
+
+def test_impossible_travel_distance_is_large() -> None:
+    persona, events = build_baseline()
+
+    result = ImpossibleTravelInjector(
+        seed=42,
+        travel_minutes=30,
+    ).inject(events, persona)
+
+    attack_event = next(
+        event
+        for event in result
+        if event.label
+        == ThreatLabel.IMPOSSIBLE_TRAVEL
+    )
+
+    distance = haversine_distance_km(
+        persona.home_location,
+        attack_event.geo_location,
+    )
+
+    assert distance > 3000
+
+
+def test_impossible_travel_requires_extreme_speed() -> None:
+    persona, events = build_baseline()
+
+    result = ImpossibleTravelInjector(
+        seed=42,
+        travel_minutes=30,
+    ).inject(events, persona)
+
+    attack_event = next(
+        event
+        for event in result
+        if event.label
+        == ThreatLabel.IMPOSSIBLE_TRAVEL
+    )
+
+    persona_events = [
+        event
+        for event in events
+        if event.entity_id == persona.entity_id
+        and event.timestamp < attack_event.timestamp
+    ]
+
+    anchor = min(
+        persona_events,
+        key=lambda event: abs(
+            (
+                attack_event.timestamp
+                - event.timestamp
+            ).total_seconds()
+            - 1800
+        ),
+    )
+
+    elapsed_seconds = (
+        attack_event.timestamp
+        - anchor.timestamp
+    ).total_seconds()
+
+    speed = implied_speed_kmh(
+        anchor.geo_location,
+        attack_event.geo_location,
+        elapsed_seconds,
+    )
+
+    assert speed > 1000
+
+
+def test_implied_speed_rejects_zero_time() -> None:
+    persona, _ = build_baseline()
+
+    with pytest.raises(ValueError):
+        implied_speed_kmh(
+            persona.home_location,
+            persona.home_location,
+            0,
+        )

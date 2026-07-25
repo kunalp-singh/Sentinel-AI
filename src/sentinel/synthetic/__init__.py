@@ -3,6 +3,7 @@ from sentinel.synthetic.attacks import (
     AttackInjector,
     AttackRateManager,
     BruteForceInjector,
+    ImpossibleTravelInjector,
 )
 from sentinel.synthetic.dataset import SyntheticDatasetBuilder
 from sentinel.synthetic.generator import NormalEventGenerator
@@ -18,4 +19,5 @@ __all__ = [
     "NormalEventGenerator",
     "PersonaFactory",
     "SyntheticDatasetBuilder",
+    "ImpossibleTravelInjector",
 ]
