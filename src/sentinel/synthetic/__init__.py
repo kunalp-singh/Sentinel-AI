@@ -5,7 +5,9 @@ from sentinel.synthetic.attacks import (
     BruteForceInjector,
     CampaignInjector,
     CredentialStuffingInjector,
+    DeviceSpoofingInjector,
     ImpossibleTravelInjector,
+    LateralMovementInjector,
 )
 from sentinel.synthetic.dataset import SyntheticDatasetBuilder
 from sentinel.synthetic.generator import NormalEventGenerator
@@ -18,10 +20,12 @@ __all__ = [
     "AttackRateManager",
     "BehavioralPersona",
     "BruteForceInjector",
+    "CampaignInjector",
+    "CredentialStuffingInjector",
+    "ImpossibleTravelInjector",
+    "LateralMovementInjector",
     "NormalEventGenerator",
     "PersonaFactory",
     "SyntheticDatasetBuilder",
-    "ImpossibleTravelInjector",
-    "CampaignInjector",
-    "CredentialStuffingInjector",
+    "DeviceSpoofingInjector",
 ]

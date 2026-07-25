@@ -5,7 +5,9 @@ import pytest
 from sentinel.domain import EventOutcome, ThreatLabel
 from sentinel.synthetic import (
     BruteForceInjector,
+    DeviceSpoofingInjector,
     ImpossibleTravelInjector,
+    LateralMovementInjector,
     NormalEventGenerator,
     PersonaFactory,
 )
@@ -271,3 +273,280 @@ def test_implied_speed_rejects_zero_time() -> None:
             persona.home_location,
             0,
         )
+
+
+def get_lateral_events(events):
+    return [
+        event
+        for event in events
+        if event.label
+        == ThreatLabel.LATERAL_MOVEMENT
+    ]
+
+
+def test_lateral_movement_adds_sequence() -> None:
+    persona, events = build_baseline()
+
+    result = LateralMovementInjector(
+        seed=42,
+    ).inject(events, persona)
+
+    attacks = get_lateral_events(result)
+
+    assert len(attacks) >= 3
+
+
+def test_lateral_movement_accesses_novel_resources() -> None:
+    persona, events = build_baseline()
+
+    result = LateralMovementInjector(
+        seed=42,
+    ).inject(events, persona)
+
+    attacks = get_lateral_events(result)
+
+    assert all(
+        event.resource_accessed
+        not in persona.common_resources
+        for event in attacks
+    )
+
+
+def test_lateral_movement_is_successful() -> None:
+    persona, events = build_baseline()
+
+    result = LateralMovementInjector(
+        seed=42,
+    ).inject(events, persona)
+
+    attacks = get_lateral_events(result)
+
+    assert all(
+        event.outcome == EventOutcome.SUCCESS
+        for event in attacks
+    )
+
+
+def test_lateral_movement_is_temporally_dense() -> None:
+    persona, events = build_baseline()
+
+    result = LateralMovementInjector(
+        seed=42,
+        interval_minutes=3,
+    ).inject(events, persona)
+
+    attacks = sorted(
+        get_lateral_events(result),
+        key=lambda event: event.timestamp,
+    )
+
+    duration = (
+        attacks[-1].timestamp
+        - attacks[0].timestamp
+    )
+
+    assert duration.total_seconds() <= 15 * 60
+
+
+def test_lateral_movement_preserves_source_ip() -> None:
+    persona, events = build_baseline()
+
+    result = LateralMovementInjector(
+        seed=42,
+    ).inject(events, persona)
+
+    attacks = get_lateral_events(result)
+
+    normal_ips = {
+        event.source_ip
+        for event in events
+    }
+
+    assert all(
+        event.source_ip in normal_ips
+        for event in attacks
+    )
+
+
+def test_lateral_movement_preserves_known_device() -> None:
+    persona, events = build_baseline()
+
+    result = LateralMovementInjector(
+        seed=42,
+    ).inject(events, persona)
+
+    attacks = get_lateral_events(result)
+
+    assert all(
+        event.device_fingerprint.fingerprint_id
+        in persona.known_device_ids
+        for event in attacks
+    )
+
+
+def test_lateral_movement_reaches_sensitive_resource() -> None:
+    persona, events = build_baseline()
+
+    result = LateralMovementInjector(
+        seed=42,
+    ).inject(events, persona)
+
+    attacks = get_lateral_events(result)
+
+    resources = {
+        event.resource_accessed
+        for event in attacks
+    }
+
+    assert "secrets-vault" in resources
+
+
+def test_lateral_movement_rejects_empty_events() -> None:
+    persona = PersonaFactory(
+        seed=42
+    ).create_users(1)[0]
+
+    injector = LateralMovementInjector(seed=42)
+
+    with pytest.raises(ValueError):
+        injector.inject([], persona)
+
+def get_device_spoofing_events(events):
+    return [
+        event
+        for event in events
+        if event.label
+        == ThreatLabel.DEVICE_SPOOFING
+    ]
+
+
+def test_device_spoofing_adds_one_event() -> None:
+    persona, events = build_baseline()
+
+    result = DeviceSpoofingInjector(
+        seed=42,
+    ).inject(events, persona)
+
+    attacks = get_device_spoofing_events(result)
+
+    assert len(attacks) == 1
+    assert len(result) == len(events) + 1
+
+
+def test_device_spoofing_reuses_device_id() -> None:
+    persona, events = build_baseline()
+
+    result = DeviceSpoofingInjector(
+        seed=42,
+    ).inject(events, persona)
+
+    attack = get_device_spoofing_events(result)[0]
+
+    known_ids = {
+        event.device_fingerprint.fingerprint_id
+        for event in events
+    }
+
+    assert (
+        attack.device_fingerprint.fingerprint_id
+        in known_ids
+    )
+
+
+def test_device_spoofing_changes_fingerprint() -> None:
+    persona, events = build_baseline()
+
+    result = DeviceSpoofingInjector(
+        seed=42,
+    ).inject(events, persona)
+
+    attack = get_device_spoofing_events(result)[0]
+
+    original = next(
+        event.device_fingerprint
+        for event in events
+        if (
+            event.device_fingerprint.fingerprint_id
+            == attack.device_fingerprint.fingerprint_id
+        )
+    )
+
+    assert (
+        attack.device_fingerprint.operating_system
+        != original.operating_system
+        or attack.device_fingerprint.browser
+        != original.browser
+        or attack.device_fingerprint.device_type
+        != original.device_type
+    )
+
+
+def test_device_spoofing_preserves_source_ip() -> None:
+    persona, events = build_baseline()
+
+    result = DeviceSpoofingInjector(
+        seed=42,
+    ).inject(events, persona)
+
+    attack = get_device_spoofing_events(result)[0]
+
+    matching_events = [
+        event
+        for event in events
+        if (
+            event.device_fingerprint.fingerprint_id
+            == attack.device_fingerprint.fingerprint_id
+        )
+    ]
+
+    assert any(
+        event.source_ip == attack.source_ip
+        for event in matching_events
+    )
+
+def test_device_spoofing_preserves_location() -> None:
+    persona, events = build_baseline()
+
+    result = DeviceSpoofingInjector(
+        seed=42,
+    ).inject(events, persona)
+
+    attack = get_device_spoofing_events(result)[0]
+
+    known_locations = {
+        (
+            event.geo_location.latitude,
+            event.geo_location.longitude,
+        )
+        for event in events
+    }
+
+    attack_location = (
+        attack.geo_location.latitude,
+        attack.geo_location.longitude,
+    )
+
+    assert attack_location in known_locations
+
+
+def test_device_spoofing_is_successful() -> None:
+    persona, events = build_baseline()
+
+    result = DeviceSpoofingInjector(
+        seed=42,
+    ).inject(events, persona)
+
+    attack = get_device_spoofing_events(result)[0]
+
+    assert attack.outcome == EventOutcome.SUCCESS
+
+
+def test_device_spoofing_rejects_empty_events() -> None:
+    persona = PersonaFactory(
+        seed=42
+    ).create_users(1)[0]
+
+    with pytest.raises(ValueError):
+        DeviceSpoofingInjector(
+            seed=42
+        ).inject([], persona)
