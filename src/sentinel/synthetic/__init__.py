@@ -3,6 +3,8 @@ from sentinel.synthetic.attacks import (
     AttackInjector,
     AttackRateManager,
     BruteForceInjector,
+    CampaignInjector,
+    CredentialStuffingInjector,
     ImpossibleTravelInjector,
 )
 from sentinel.synthetic.dataset import SyntheticDatasetBuilder
@@ -20,4 +22,6 @@ __all__ = [
     "PersonaFactory",
     "SyntheticDatasetBuilder",
     "ImpossibleTravelInjector",
+    "CampaignInjector",
+    "CredentialStuffingInjector",
 ]
