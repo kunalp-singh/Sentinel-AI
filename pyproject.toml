@@ -18,6 +18,7 @@ dependencies = [
     "numpy>=2.0,<3.0",
     "pandas>=2.2,<4.0",
     "faker>=37.0,<40.0",
+    "scikit-learn>=1.5,<2.0",
 ]
 
 
