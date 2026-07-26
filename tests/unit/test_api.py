@@ -3,9 +3,12 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 from sentinel.api import app
-from sentinel.explainability import (
-    SecurityExplanation,
+from sentinel.api.service import AnalysisResult
+from sentinel.classification import (
+    AnomalyType,
+    ClassificationResult,
 )
+from sentinel.explainability import SecurityExplanation
 
 client = TestClient(app)
 
@@ -49,6 +52,7 @@ def test_swagger_docs_are_available() -> None:
     response = client.get("/docs")
 
     assert response.status_code == 200
+
 
 def valid_event_payload() -> dict[str, object]:
     return {
@@ -97,9 +101,20 @@ def test_analyze_endpoint_returns_assessment() -> None:
         behavioral_contribution=55.0,
     )
 
+    result = AnalysisResult(
+        explanation=explanation,
+        classification=ClassificationResult(
+            anomaly_type=AnomalyType.IMPOSSIBLE_TRAVEL,
+            confidence=0.95,
+            evidence=(
+                "Travel would require impossible speed",
+            ),
+        ),
+    )
+
     with patch(
         "sentinel.api.app.analysis_service.analyze",
-        return_value=explanation,
+        return_value=result,
     ):
         response = client.post(
             "/analyze",
@@ -110,10 +125,23 @@ def test_analyze_endpoint_returns_assessment() -> None:
 
     data = response.json()
 
+    assert data["event_id"] == "EVENT_API_TEST"
+    assert data["entity_id"] == "USER_00001"
+
     assert data["risk_score"] == 55.0
     assert data["severity"] == "medium"
     assert data["is_suspicious"] is True
+
+    assert data["anomaly_type"] == "impossible_travel"
+    assert data["classification_confidence"] == 0.95
+    assert data["classification_evidence"] == [
+        "Travel would require impossible speed",
+    ]
+
+    assert data["ml_anomaly_score"] == -0.05
     assert data["ml_flagged"] is False
+    assert data["ml_contribution"] == 0.0
+    assert data["behavioral_contribution"] == 55.0
 
 
 def test_analyze_rejects_invalid_event() -> None:

@@ -69,9 +69,10 @@ def analyze(
     """Analyze a telemetry event for behavioral risk."""
 
     try:
-        explanation = (
-            analysis_service.analyze(event)
-        )
+        result = analysis_service.analyze(event)
+
+        explanation = result.explanation
+        classification = result.classification
 
     except ValueError as exc:
         raise HTTPException(
@@ -100,5 +101,10 @@ def analyze(
         ),
         behavioral_contribution=(
             explanation.behavioral_contribution
+        ),
+        anomaly_type=classification.anomaly_type.value,
+        classification_confidence=classification.confidence,
+        classification_evidence=list(
+            classification.evidence
         ),
     )

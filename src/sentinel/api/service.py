@@ -1,11 +1,19 @@
+from dataclasses import dataclass
 from datetime import date, timedelta
 
+from sentinel.classification import (
+    AnomalyTypeClassifier,
+    ClassificationResult,
+)
 from sentinel.detection import (
     HybridRiskScorer,
     IsolationForestDetector,
 )
 from sentinel.domain import SecurityEvent
-from sentinel.explainability import SecurityExplainer
+from sentinel.explainability import (
+    SecurityExplainer,
+    SecurityExplanation,
+)
 from sentinel.features import (
     MODEL_FEATURES,
     FeatureMatrixBuilder,
@@ -18,10 +26,14 @@ from sentinel.synthetic import (
     NormalEventGenerator,
     PersonaFactory,
 )
-from sentinel.explainability import (
-    SecurityExplainer,
-    SecurityExplanation,
-)
+
+
+@dataclass(frozen=True)
+class AnalysisResult:
+    """Complete SentinelAI event assessment."""
+
+    explanation: SecurityExplanation
+    classification: ClassificationResult
 
 class SentinelAnalysisService:
     """In-memory SentinelAI detection pipeline."""
@@ -43,6 +55,8 @@ class SentinelAnalysisService:
             n_estimators=200,
             random_state=seed,
         )
+
+        self._classifier = AnomalyTypeClassifier()
 
         self._profiles: dict[
             str,
@@ -124,7 +138,7 @@ class SentinelAnalysisService:
     def analyze(
         self,
         event: SecurityEvent,
-    ) -> SecurityExplanation:
+    ) -> AnalysisResult:
         """Analyze one security event."""
 
         if event.entity_id not in self._profiles:
@@ -184,12 +198,20 @@ class SentinelAnalysisService:
             prediction,
         )
 
-        explanation = (
-            self._explainer.explain(
-                event,
-                assessment,
-                prediction,
-            )
+        explanation = self._explainer.explain(
+            event,
+            assessment,
+            prediction,
         )
 
-        return explanation
+        classification = self._classifier.classify(
+            features,
+            is_suspicious=(
+                assessment.score >= 30.0
+            ),
+        )
+
+        return AnalysisResult(
+            explanation=explanation,
+            classification=classification,
+        )

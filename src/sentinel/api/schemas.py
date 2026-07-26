@@ -42,3 +42,7 @@ class AnalysisResponse(BaseModel):
 
     ml_contribution: float
     behavioral_contribution: float
+
+    anomaly_type: str
+    classification_confidence: float
+    classification_evidence: list[str]
