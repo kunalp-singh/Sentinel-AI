@@ -1,3 +1,7 @@
+from sentinel.evaluation.alert_budget import (
+    AlertBudgetEvaluator,
+    AlertBudgetResult,
+)
 from sentinel.evaluation.evaluator import (
     AttackMetrics,
     DetectorEvaluator,
@@ -5,6 +9,8 @@ from sentinel.evaluation.evaluator import (
 )
 
 __all__ = [
+    "AlertBudgetEvaluator",
+    "AlertBudgetResult",
     "AttackMetrics",
     "DetectorEvaluator",
     "EvaluationResult",
